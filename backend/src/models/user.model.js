@@ -20,7 +20,6 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 			minlength: 6,
-			select: false,
 		},
 		role: {
 			type: String,
@@ -37,18 +36,16 @@ const userSchema = new mongoose.Schema(
 )
 
 userSchema.pre('save', async function (next) {
+    console.log('PRE SAVE HOOK RUNNING')
+  console.log('isModified password:', this.isModified('password'))
 	if (!this.isModified('password')) {
-		return next()
+		return 
 	}
+    this.password = await bcrypt.hash(this.password, 10)
+    console.log('PASSWORD HASHED:', this.password)
 
-	try {
-		this.password = await bcrypt.hash(this.password, 10)
-		next()
-	} catch (error) {
-		next(error)
-	}
+	
 })
-
 userSchema.methods.isPasswordCorrect = async function (password) {
 	return bcrypt.compare(password, this.password)
 }
