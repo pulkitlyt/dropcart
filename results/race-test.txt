@@ -1,0 +1,32 @@
+Cleaning previous race-test data...
+Provisioning 300 buyers...
+  300 buyers ready
+
+Firing 300 concurrent checkouts at a sale with 25 stock.
+
+NAIVE  (read-then-write)
+  sale stock            : 25
+  concurrent buyers     : 300
+  HTTP 201 (sold)       : 300
+  rejected              : 0
+  orders in db          : 300
+  remainingStock        : 23
+  5xx errors            : 0
+  >> OVERSOLD BY        : 275 ❌
+
+ATOMIC (findOneAndUpdate guard)
+  sale stock            : 25
+  concurrent buyers     : 300
+  HTTP 201 (sold)       : 25
+  rejected              : 275
+  orders in db          : 25
+  remainingStock        : 0
+  5xx errors            : 0
+  >> OVERSOLD BY        : 0 ✅
+
+====================================================
+naive oversold : 275
+atomic oversold: 0
+====================================================
+
+Cleaning up...

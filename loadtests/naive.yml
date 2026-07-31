@@ -1,0 +1,18 @@
+config:
+  target: 'http://localhost:8000'
+  http:
+    timeout: 30
+  phases:
+    - duration: 10
+      arrivalRate: 50   # 50 new users per second for 10s = 500 total requests
+  defaults:
+    headers:
+      Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTY1MjBmNDQ2ODYwOGU0MTEyZWZlNWEiLCJlbWFpbCI6ImJ1eWVyQHRlc3QuY29tIiwibmFtZSI6IlRlc3QgQnV5ZXIiLCJyb2xlIjoiYnV5ZXIiLCJpYXQiOjE3ODUwMTM2NTMsImV4cCI6MTc4NTAxNDU1M30.AVysMTAANMhvwfp-iRFnjSLNXpXlv7PSfTx2Q6husxY'
+      Content-Type: 'application/json'
+scenarios:
+  - name: 'Naive checkout race condition'
+    flow:
+      - post:
+          url: '/api/v1/flash-sales/checkout/naive'
+          json:
+            flashSaleId: '6a691bea5bcec410914e576c'

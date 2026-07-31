@@ -36,13 +36,10 @@ const userSchema = new mongoose.Schema(
 )
 
 userSchema.pre('save', async function (next) {
-    console.log('PRE SAVE HOOK RUNNING')
-  console.log('isModified password:', this.isModified('password'))
 	if (!this.isModified('password')) {
 		return 
 	}
     this.password = await bcrypt.hash(this.password, 10)
-    console.log('PASSWORD HASHED:', this.password)
 
 	
 })

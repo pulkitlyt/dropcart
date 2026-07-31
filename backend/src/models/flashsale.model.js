@@ -45,22 +45,6 @@ const flashSaleSchema = new mongoose.Schema(
 	},
 )
 
-flashSaleSchema.pre('save', function (next) {
-	if (!this.isModified('totalStock') && !this.isModified('remainingStock')) {
-		return next()
-	}
-
-	if (typeof this.remainingStock !== 'number') {
-		this.remainingStock = this.totalStock
-	}
-
-	if (this.remainingStock > this.totalStock) {
-		this.remainingStock = this.totalStock
-	}
-
-	next()
-})
-
 flashSaleSchema.virtual('isLive').get(function () {
 	const now = new Date()
 	return this.isActive && now >= this.startTime && now <= this.endTime

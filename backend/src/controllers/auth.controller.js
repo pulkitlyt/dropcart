@@ -4,6 +4,18 @@ import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 
+// In dev the frontend is proxied onto the same origin, so 'strict' works and
+// keeps CSRF risk low. Once deployed the API sits on a different domain to the
+// site, and a strict/lax cookie is simply never sent — it has to be
+// SameSite=None, which browsers only accept together with Secure.
+const isProduction = process.env.NODE_ENV === 'production'
+
+const COOKIE_OPTIONS = {
+	httpOnly: true,
+	secure: true,
+	sameSite: isProduction ? 'none' : 'strict',
+}
+
 const registerUser = asyncHandler(async (req, res) => {
 	const { name, email, password, role } = req.body
 
@@ -16,11 +28,16 @@ const registerUser = asyncHandler(async (req, res) => {
 		throw new ApiError(409, 'User with email already exists')
 	}
 
+	// Never trust the role from the request body: 'admin' can only be granted
+	// out-of-band, otherwise anyone could self-register with full privileges.
+	const SELF_ASSIGNABLE_ROLES = ['buyer', 'seller']
+	const requestedRole = SELF_ASSIGNABLE_ROLES.includes(role) ? role : 'buyer'
+
 	const user = await User.create({
 		name,
 		email,
 		password,
-		role,
+		role: requestedRole,
 	})
 
 	const createdUser = await User.findById(user._id).select('-password -refreshToken')
@@ -42,8 +59,7 @@ const loginUser = asyncHandler(async (req, res) => {
 	if (!user) {
 		throw new ApiError(404, 'User not found')
 	}
-    console.log('password from db:', user.password)
-console.log('password from request:', password)
+
 	const isPasswordValid = await user.isPasswordCorrect(password)
 	if (!isPasswordValid) {
 		throw new ApiError(401, 'Invalid credentials')
@@ -57,11 +73,7 @@ console.log('password from request:', password)
 
 	const loggedInUser = await User.findById(user._id).select('-password -refreshToken')
 
-	const cookieOptions = {
-		httpOnly: true,
-		secure: true,
-		sameSite: 'strict',
-	}
+	const cookieOptions = COOKIE_OPTIONS
 
 	return res
 		.status(200)
@@ -77,11 +89,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 		},
 	})
 
-	const cookieOptions = {
-		httpOnly: true,
-		secure: true,
-		sameSite: 'strict',
-	}
+	const cookieOptions = COOKIE_OPTIONS
 
 	return res
 		.status(200)
@@ -116,11 +124,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 	user.refreshToken = refreshToken
 	await user.save({ validateBeforeSave: false })
 
-	const cookieOptions = {
-		httpOnly: true,
-		secure: true,
-		sameSite: 'strict',
-	}
+	const cookieOptions = COOKIE_OPTIONS
 
 	return res
 		.status(200)

@@ -1,0 +1,17 @@
+config:
+  target: 'http://localhost:8000'
+  phases:
+    - duration: 10
+      arrivalRate: 50
+  defaults:
+    headers:
+      Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2YTY1MjBmNDQ2ODYwOGU0MTEyZWZlNWEiLCJlbWFpbCI6ImJ1eWVyQHRlc3QuY29tIiwibmFtZSI6IlRlc3QgQnV5ZXIiLCJyb2xlIjoiYnV5ZXIiLCJpYXQiOjE3ODUwMTM2NTMsImV4cCI6MTc4NTAxNDU1M30.AVysMTAANMhvwfp-iRFnjSLNXpXlv7PSfTx2Q6husxY'
+      Content-Type: 'application/json'
+      x-idempotency-key: '{{ $randomString() }}'
+scenarios:
+  - name: 'Atomic checkout - race condition fixed'
+    flow:
+      - post:
+          url: '/api/v1/flash-sales/checkout/atomic'
+          json:
+            flashSaleId: '6a691bea5bcec410914e576c'

@@ -46,6 +46,19 @@ const productSchema = new mongoose.Schema(
 			type: Boolean,
 			default: true,
 		},
+		// Denormalised from the reviews collection so listing pages don't need an
+		// aggregation per product. Recomputed whenever a review changes.
+		ratingAverage: {
+			type: Number,
+			default: 0,
+			min: 0,
+			max: 5,
+		},
+		ratingCount: {
+			type: Number,
+			default: 0,
+			min: 0,
+		},
 	},
 	{
 		timestamps: true,
