@@ -4,16 +4,14 @@ import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 
-// In dev the frontend is proxied onto the same origin, so 'strict' works and
-// keeps CSRF risk low. Once deployed the API sits on a different domain to the
-// site, and a strict/lax cookie is simply never sent — it has to be
-// SameSite=None, which browsers only accept together with Secure.
-const isProduction = process.env.NODE_ENV === 'production'
-
+// The API is served from the same origin as the site in both environments —
+// via the vite proxy locally, and as a serverless function under /api in
+// production. That means the cookie can stay SameSite=Strict, which is the
+// strongest CSRF posture; a split-domain deploy would have forced 'none'.
 const COOKIE_OPTIONS = {
 	httpOnly: true,
 	secure: true,
-	sameSite: isProduction ? 'none' : 'strict',
+	sameSite: 'strict',
 }
 
 const registerUser = asyncHandler(async (req, res) => {

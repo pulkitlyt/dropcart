@@ -11,14 +11,15 @@ import orderRouter from './routes/order.routes.js'
 import eventRouter from './routes/event.routes.js'
 import reviewRouter from './routes/review.routes.js'
 
-dotenv.config({
-	path: './.env',
-})
+// Local only: on Vercel the values come from the project's environment
+// settings and there is no .env file to read, which dotenv handles quietly.
+dotenv.config({ path: './.env', quiet: true })
 
 const app = express()
 
-// CORS_ORIGIN accepts a comma-separated list so local dev, a preview URL and
-// production can all be allowed without redeploying between them.
+// Same-origin in both environments means CORS is not normally exercised at all.
+// This stays as a safety net for anyone running the API on a separate host:
+// CORS_ORIGIN accepts a comma-separated list of allowed origins.
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
 	.split(',')
 	.map((origin) => origin.trim())
