@@ -8,6 +8,7 @@ import {
 	getFlashSaleById,
 	naiveCheckout,
 	atomicCheckout,
+	redisCheckout,
 } from '../controllers/flashsale.controller.js'
 import { verifyJWT } from '../middlewares/auth.middleware.js'
 import { verifyRole } from '../middlewares/role.middleware.js'
@@ -25,5 +26,6 @@ router.patch('/:id/activate', verifyJWT, verifyRole('admin', 'seller'), activate
 router.patch('/:id/end', verifyJWT, verifyRole('admin', 'seller'), endFlashSale)
 router.post('/checkout/naive', verifyJWT, naiveCheckout)
 router.post('/checkout/atomic', verifyJWT, idempotencyCheck, atomicCheckout)
+router.post('/checkout/redis', verifyJWT, idempotencyCheck, redisCheckout)
 
 export default router

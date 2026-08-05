@@ -12,9 +12,10 @@ NAIVE  (read-then-write)
   orders in db          : 300
   remainingStock        : 23
   5xx errors            : 0
+  wall clock            : 12053 ms  (25 req/s)
   >> OVERSOLD BY        : 275 ❌
 
-ATOMIC (findOneAndUpdate guard)
+ATOMIC (mongo findOneAndUpdate guard)
   sale stock            : 25
   concurrent buyers     : 300
   HTTP 201 (sold)       : 25
@@ -22,11 +23,27 @@ ATOMIC (findOneAndUpdate guard)
   orders in db          : 25
   remainingStock        : 0
   5xx errors            : 0
+  wall clock            : 13161 ms  (23 req/s)
   >> OVERSOLD BY        : 0 ✅
 
-====================================================
-naive oversold : 275
-atomic oversold: 0
-====================================================
+REDIS  (DECR guard)
+  sale stock            : 25
+  concurrent buyers     : 300
+  HTTP 201 (sold)       : 25
+  rejected              : 275
+  orders in db          : 25
+  remainingStock        : 0
+  5xx errors            : 0
+  wall clock            : 9978 ms  (30 req/s)
+  >> OVERSOLD BY        : 0 ✅
+
+==============================================================
+strategy                       oversold    req/s     wall
+--------------------------------------------------------------
+naive  (read-then-write)            275       25  12053ms
+atomic (mongo findOneAndUpdate)       0       23  13161ms
+redis  (DECR)                         0       30   9978ms
+==============================================================
+redis vs mongo-atomic: 1.32x faster
 
 Cleaning up...

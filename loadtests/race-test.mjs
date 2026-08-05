@@ -7,6 +7,12 @@
  * concurrent request, which is what a real stampede looks like.
  *
  *   node loadtests/race-test.mjs [concurrency] [saleStock]
+ *
+ * Runs three checkout strategies against an identical sale and reports how many
+ * units each oversold, plus wall-clock time for the whole stampede:
+ *   naive  - read-then-write in application code   (broken by design)
+ *   atomic - mongo findOneAndUpdate as the gate    (correct, disk-backed)
+ *   redis  - redis DECR as the gate                (correct, in-memory)
  */
 import mongoose from '../backend/node_modules/mongoose/index.js'
 import fs from 'node:fs'
@@ -120,6 +126,7 @@ const makeSale = async () => {
 }
 
 const stampede = async (route, saleId) => {
+	const startedAt = Date.now()
 	const results = await Promise.all(
 		buyerTokens.map((token, i) =>
 			api(route, {
@@ -131,12 +138,21 @@ const stampede = async (route, saleId) => {
 		),
 	)
 
+	const elapsedMs = Date.now() - startedAt
 	const sold = results.filter((r) => r.status === 201).length
 	const rejected = results.length - sold
 	const sale = await db.collection('flashsales').findOne({ _id: new mongoose.Types.ObjectId(saleId) })
 	const orders = await db.collection('orders').countDocuments({ flashSale: new mongoose.Types.ObjectId(saleId) })
 
-	return { sold, rejected, remainingStock: sale.remainingStock, orders, errors: results.filter((r) => r.status >= 500).length }
+	return {
+		sold,
+		rejected,
+		remainingStock: sale.remainingStock,
+		orders,
+		errors: results.filter((r) => r.status >= 500).length,
+		elapsedMs,
+		rps: Math.round((results.length / elapsedMs) * 1000),
+	}
 }
 
 const report = (label, stock, r) => {
@@ -149,6 +165,7 @@ const report = (label, stock, r) => {
 	console.log(`  orders in db          : ${r.orders}`)
 	console.log(`  remainingStock        : ${r.remainingStock}`)
 	console.log(`  5xx errors            : ${r.errors}`)
+	console.log(`  wall clock            : ${r.elapsedMs} ms  (${r.rps} req/s)`)
 	console.log(`  >> OVERSOLD BY        : ${oversold > 0 ? oversold : 0} ${oversold > 0 ? '❌' : '✅'}`)
 	return oversold
 }
@@ -161,15 +178,32 @@ const naiveOversold = report('NAIVE  (read-then-write)', SALE_STOCK, naive)
 
 const atomicSale = await makeSale()
 const atomic = await stampede('/flash-sales/checkout/atomic', atomicSale)
-const atomicOversold = report('ATOMIC (findOneAndUpdate guard)', SALE_STOCK, atomic)
+const atomicOversold = report('ATOMIC (mongo findOneAndUpdate guard)', SALE_STOCK, atomic)
 
-console.log('\n' + '='.repeat(52))
-console.log(`naive oversold : ${naiveOversold > 0 ? naiveOversold : 0}`)
-console.log(`atomic oversold: ${atomicOversold > 0 ? atomicOversold : 0}`)
-console.log('='.repeat(52))
+const redisSale = await makeSale()
+const redisRun = await stampede('/flash-sales/checkout/redis', redisSale)
+const redisOversold = report('REDIS  (DECR guard)', SALE_STOCK, redisRun)
+
+const pad = (v, n) => String(v).padStart(n)
+console.log('\n' + '='.repeat(62))
+console.log('strategy                       oversold    req/s     wall')
+console.log('-'.repeat(62))
+for (const [label, r, over] of [
+	['naive  (read-then-write)', naive, naiveOversold],
+	['atomic (mongo findOneAndUpdate)', atomic, atomicOversold],
+	['redis  (DECR)', redisRun, redisOversold],
+]) {
+	console.log(
+		`${label.padEnd(31)}${pad(over > 0 ? over : 0, 8)}${pad(r.rps, 9)}${pad(r.elapsedMs + 'ms', 9)}`,
+	)
+}
+console.log('='.repeat(62))
+if (atomic.elapsedMs && redisRun.elapsedMs) {
+	console.log(`redis vs mongo-atomic: ${(atomic.elapsedMs / redisRun.elapsedMs).toFixed(2)}x faster`)
+}
 
 if (!process.env.KEEP_DATA) {
 	console.log('\nCleaning up...')
 	await cleanup()
 }
-process.exit(atomicOversold > 0 ? 1 : 0)
+process.exit(atomicOversold > 0 || redisOversold > 0 ? 1 : 0)

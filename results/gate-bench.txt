@@ -1,0 +1,20 @@
+GATE PRIMITIVE MICRO-BENCHMARK  (node loadtests/gate-bench.mjs 2000)
+generated: 2026-08-05T12:13Z
+
+
+Sequential gate operations (N=2000):
+
+  mongo findOneAndUpdate ($inc)       215801 ms   107.900 ms/op   9 ops/s
+  redis DECR                             145 ms   0.072 ms/op   13,805 ops/s
+
+  redis is 1489.6x faster on the gate operation itself
+
+  CAVEAT — read this before quoting the number:
+  Redis here is on localhost (~0.07ms); Atlas is a remote cluster over the
+  internet (~100ms). Most of this ratio is geography, not engine design. A
+  co-located mongo would land around 1-2ms/op, i.e. roughly 20-30x, not 1000x.
+
+  The end-to-end figure from race-test.mjs (~1.3x) is the honest one for this
+  architecture: the gate is a small share of a checkout that also writes a
+  reservation and an order to Atlas, so speeding up the gate alone barely moves
+  total throughput. Redis wins decisively only once the gate is the bottleneck.

@@ -5,6 +5,7 @@ import Reservation from '../models/reservation.model.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
+import * as redis from '../lib/redis.js'
 
 const createFlashSale = asyncHandler(async (req, res) => {
 	const { productId, salePrice, totalStock, startTime, endTime, perUserLimit } = req.body
@@ -110,6 +111,9 @@ const activateFlashSale = asyncHandler(async (req, res) => {
 
 	flashSale.isActive = true
 	await flashSale.save()
+
+	// Prime the hot counter so the first buyer doesn't pay the seeding cost.
+	await redis.seedStock(flashSale._id, flashSale.remainingStock)
 
 	return res.status(200).json(new ApiResponse(200, flashSale, 'Flash sale activated successfully'))
 })
@@ -264,6 +268,107 @@ const atomicCheckout = asyncHandler(async (req, res) => {
 	return res.status(201).json(new ApiResponse(201, order, 'Checkout completed successfully'))
 })
 
+/**
+ * Redis-gated checkout.
+ *
+ * Same guarantee as atomicCheckout, different gatekeeper: redis' DECR decides
+ * who wins instead of mongo's findOneAndUpdate. Redis is authoritative for the
+ * *hot counter*; mongo remains the durable record of what was actually sold.
+ *
+ * That split is the tradeoff worth naming: an in-memory counter is far faster
+ * but is not durable on its own, so mongo's remainingStock is still decremented
+ * for every winning claim. If redis is unavailable this delegates to
+ * atomicCheckout rather than failing — redis is an accelerator, not a
+ * dependency.
+ */
+const redisCheckout = asyncHandler(async (req, res, next) => {
+	const { flashSaleId } = req.body
+	const idempotencyKey = req.headers['x-idempotency-key']
+
+	if (!flashSaleId) throw new ApiError(400, 'flashSaleId is required')
+	if (!idempotencyKey) throw new ApiError(400, 'x-idempotency-key header is required')
+
+	if (!redis.isReady()) return atomicCheckout(req, res, next)
+
+	const now = new Date()
+	const sale = await FlashSale.findById(flashSaleId)
+
+	if (!sale) throw new ApiError(404, 'Flash sale not found')
+	if (!sale.isActive) throw new ApiError(400, 'This sale is not active')
+	if (sale.startTime > now) throw new ApiError(400, 'This sale has not started yet')
+	if (sale.endTime <= now) throw new ApiError(400, 'This sale has ended')
+
+	// A counter may not exist yet if the sale was activated before redis came up.
+	if ((await redis.getStock(flashSaleId)) === null) {
+		await redis.seedStock(flashSaleId, sale.remainingStock)
+	}
+
+	const claim = await redis.claimStock(flashSaleId)
+
+	if (claim.reason === 'unavailable') return atomicCheckout(req, res, next)
+	if (!claim.ok) throw new ApiError(409, 'Sold out')
+
+	// We hold one unit in redis. Every failure below must hand it back.
+	const releaseAll = async () => {
+		await redis.releaseStock(flashSaleId)
+	}
+
+	let reservation
+	try {
+		reservation = await Reservation.create({
+			flashSale: flashSaleId,
+			product: sale.product,
+			user: req.user._id,
+			quantity: 1,
+			status: 'active',
+			expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+		})
+	} catch (error) {
+		await releaseAll()
+		if (error?.code === 11000) throw new ApiError(409, 'You have already claimed this flash sale')
+		throw error
+	}
+
+	let order
+	try {
+		order = await Order.create({
+			user: req.user._id,
+			type: 'flash-sale',
+			flashSale: flashSaleId,
+			product: sale.product,
+			quantity: 1,
+			totalAmount: sale.salePrice,
+			idempotencyKey,
+			status: 'confirmed',
+			paymentStatus: 'paid',
+		})
+	} catch (error) {
+		await releaseAll()
+		await Reservation.deleteOne({ _id: reservation._id })
+
+		if (error?.code === 11000) {
+			const existingOrder = await Order.findOne({ idempotencyKey, user: req.user._id })
+			if (existingOrder) {
+				return res.status(200).json(new ApiResponse(200, existingOrder, 'Duplicate request ignored'))
+			}
+		}
+		throw error
+	}
+
+	// Mirror the claim into mongo so the durable record matches the counter.
+	// Guarded by remainingStock > 0 so a redis/mongo divergence can never push
+	// the persisted value negative.
+	await FlashSale.updateOne(
+		{ _id: flashSaleId, remainingStock: { $gt: 0 } },
+		{ $inc: { remainingStock: -1, version: 1 } },
+	)
+
+	reservation.status = 'fulfilled'
+	await reservation.save({ validateBeforeSave: false })
+
+	return res.status(201).json(new ApiResponse(201, order, 'Checkout completed successfully'))
+})
+
 export {
 	createFlashSale,
 	getActiveFlashSales,
@@ -273,4 +378,5 @@ export {
 	endFlashSale,
 	naiveCheckout,
 	atomicCheckout,
+	redisCheckout,
 }
