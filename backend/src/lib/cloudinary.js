@@ -46,12 +46,26 @@ const uploadBuffer = (buffer, { folder = 'misc', filename } = {}) =>
 			{
 				folder: `${FOLDER}/${folder}`,
 				resource_type: 'image',
-				// Let Cloudinary pick the best format and compression for each
-				// viewer instead of serving whatever the seller happened to upload.
-				transformation: [{ quality: 'auto', fetch_format: 'auto' }],
-				// Cap absurd dimensions; a 6000px phone photo helps nobody.
-				eager: [{ width: 1200, height: 1200, crop: 'limit' }],
-				public_id: filename ? filename.replace(/\.[^.]+$/, '') : undefined,
+				// These run on the *stored* asset, so secure_url points at an
+				// already-capped, already-compressed image. Putting the resize in
+				// `eager` instead only creates a derived copy while secure_url
+				// still serves the full-size original — a 2000px download for an
+				// 80px thumbnail.
+				transformation: [
+					// c_limit only shrinks; it never upscales a small image.
+					{ width: 1600, height: 1600, crop: 'limit' },
+					{ quality: 'auto', fetch_format: 'auto' },
+				],
+				// Derive the public_id from the original filename but let Cloudinary
+				// append a random suffix. Setting public_id explicitly would make
+				// two sellers uploading 'photo.jpg' collide on the same asset —
+				// and an explicit public_id causes unique_filename to be ignored,
+				// so a re-upload silently returns the existing image instead.
+				use_filename: Boolean(filename),
+				// upload_stream has no file path, so use_filename alone yields
+				// 'file_ab12cd'. filename_override supplies the original name so
+				// assets are identifiable in the media library.
+				filename_override: filename,
 				unique_filename: true,
 				overwrite: false,
 			},
