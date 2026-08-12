@@ -10,6 +10,7 @@ import flashSaleRouter from './routes/flashsale.routes.js'
 import orderRouter from './routes/order.routes.js'
 import eventRouter from './routes/event.routes.js'
 import reviewRouter from './routes/review.routes.js'
+import uploadRouter from './routes/upload.routes.js'
 
 // Local only: on Vercel the values come from the project's environment
 // settings and there is no .env file to read, which dotenv handles quietly.
@@ -57,6 +58,7 @@ app.use('/api/v1/flash-sales', flashSaleRouter)
 app.use('/api/v1/orders', orderRouter)
 app.use('/api/v1/events', eventRouter)
 app.use('/api/v1/reviews', reviewRouter)
+app.use('/api/v1/uploads', uploadRouter)
 
 app.use((err, req, res, next) => {
 	console.error(err)

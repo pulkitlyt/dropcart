@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Package, Plus, Trash2, Loader2, ArrowLeft, EyeOff, Zap, Play, Square, Ticket } from 'lucide-react'
 import { products as productsApi, flashSales as flashSalesApi, events as eventsApi } from '../lib/api'
 import SellerOrders from '../components/SellerOrders'
+import ImageUploader from '../components/ImageUploader'
 import { useAuth } from '../context/AuthContext'
 
 const EMPTY_FORM = {
@@ -13,7 +14,7 @@ const EMPTY_FORM = {
 	compareAtPrice: '',
 	stock: '',
 	category: '',
-	images: '',
+	images: [],
 }
 
 // datetime-local wants 'YYYY-MM-DDTHH:mm' in local time.
@@ -28,7 +29,7 @@ const EMPTY_EVENT_FORM = () => ({
 	venue: '',
 	city: '',
 	description: '',
-	posterImage: '',
+	posterImage: [],
 	startTime: toLocalInput(new Date(Date.now() + 24 * 60 * 60 * 1000)),
 	rows: '6',
 	seatsPerRow: '10',
@@ -103,11 +104,7 @@ const SellerPage = () => {
 				stock: Number(form.stock),
 				category: form.category || undefined,
 				compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : undefined,
-				// One URL per line keeps the form simple while the schema takes an array.
-				images: form.images
-					.split('\n')
-					.map((url) => url.trim())
-					.filter(Boolean),
+				images: form.images,
 			})
 			setForm(EMPTY_FORM)
 			await refresh()
@@ -169,7 +166,7 @@ const SellerPage = () => {
 				venue: eventForm.venue,
 				city: eventForm.city || undefined,
 				description: eventForm.description || undefined,
-				posterImage: eventForm.posterImage || undefined,
+				posterImage: eventForm.posterImage[0] || undefined,
 				startTime: new Date(eventForm.startTime).toISOString(),
 				rows: Number(eventForm.rows),
 				seatsPerRow: Number(eventForm.seatsPerRow),
@@ -302,12 +299,12 @@ const SellerPage = () => {
 									className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-white/35 focus:border-emerald-500/60 focus:outline-none"
 								/>
 							</div>
-							<textarea
-								rows={2}
-								placeholder="Image URLs, one per line"
+							<ImageUploader
 								value={form.images}
-								onChange={handleChange('images')}
-								className="resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-emerald-500/60 focus:outline-none"
+								onChange={(images) => setForm({ ...form, images })}
+								folder="products"
+								max={6}
+								label="Product images"
 							/>
 
 							<motion.button
@@ -605,11 +602,12 @@ const SellerPage = () => {
 										className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-white/35 focus:border-fuchsia-500/60 focus:outline-none"
 									/>
 								</div>
-								<input
-									placeholder="Poster image URL"
+								<ImageUploader
 									value={eventForm.posterImage}
-									onChange={handleEventChange('posterImage')}
-									className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-fuchsia-500/60 focus:outline-none"
+									onChange={(posterImage) => setEventForm({ ...eventForm, posterImage })}
+									folder="events"
+									max={1}
+									label="Event poster"
 								/>
 								<label className="text-xs text-white/40">Starts</label>
 								<input

@@ -1,5 +1,6 @@
 import Product from '../models/product.model.js'
 import FlashSale from '../models/flashsale.model.js'
+import * as cloudinary from '../lib/cloudinary.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
@@ -183,7 +184,15 @@ const deleteProduct = asyncHandler(async (req, res) => {
 
 	await Product.findByIdAndDelete(id)
 
-	return res.status(200).json(new ApiResponse(200, {}, 'Product deleted successfully'))
+	// Delete the images from cloudinary too, otherwise every deleted product
+	// leaves its assets behind consuming storage that nothing references.
+	// Best-effort and non-blocking: a failed cleanup must not fail the delete,
+	// and seeded non-cloudinary URLs are skipped automatically.
+	const removed = await cloudinary.destroyByUrls(product.images).catch(() => 0)
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, { imagesRemoved: removed }, 'Product deleted successfully'))
 })
 
 export {
