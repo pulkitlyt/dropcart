@@ -10,7 +10,6 @@ const idempotencyCheck = asyncHandler(async (req, res, next) => {
 		throw new ApiError(400, 'Idempotency key required')
 	}
 
-	// Scope by user — a key presented by one client must never return another's order.
 	const existingOrder = await Order.findOne({ idempotencyKey, user: req.user._id })
 	if (existingOrder) {
 		return res.status(200).json(new ApiResponse(200, existingOrder, 'Duplicate request ignored'))

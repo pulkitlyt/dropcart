@@ -35,8 +35,6 @@ const verifyJWT = asyncHandler(async (req, _, next) => {
 	next()
 })
 
-// For routes that are public but render differently when signed in (the seat
-// map marks the viewer's own holds). Never throws — anonymous is a valid state.
 const attachUser = asyncHandler(async (req, _, next) => {
 	const authHeader = req.get('Authorization') || req.headers.authorization || ''
 	const token = req.cookies?.accessToken || authHeader.replace(/^Bearer\s+/i, '')
@@ -49,7 +47,7 @@ const attachUser = asyncHandler(async (req, _, next) => {
 			req.user = await User.findById(decodedToken._id).select('-password -refreshToken')
 		}
 	} catch {
-		// An invalid token on a public route just means "treat as anonymous".
+		
 	}
 
 	next()

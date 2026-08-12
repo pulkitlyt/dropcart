@@ -1,13 +1,4 @@
-/**
- * Populates the shop with demo products, flash sales and ticketed events.
- *
- *   node src/seed.js          # add demo data
- *   node src/seed.js --reset  # remove previously seeded demo data first
- *
- * Everything it creates is owned by the demo seller below, so --reset only
- * removes its own data and never touches records you made yourself.
- * All image URLs were checked to return 200 before being committed here.
- */
+
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
 import connectDB from './db/index.js'
@@ -25,9 +16,6 @@ const SEED_EMAIL = 'demo-seller@dropcart.local'
 const SEED_PASSWORD = 'demoseller123'
 const img = (id) => `https://images.unsplash.com/${id}?w=900&q=80`
 
-// name, description, price, compareAtPrice, stock, category, photo id
-// Every image below was rendered and visually checked against its product name —
-// a 200 response only proves the URL resolves, not that it shows the right thing.
 const PRODUCTS = [
 	['Premium Wireless Headphones', 'Active noise cancelling with 40 hours of battery and USB-C fast charge.', 12499, 24999, 60, 'Electronics', 'photo-1505740420928-5e560c06d30e'],
 	['Slim Wireless Keyboard', 'Low-profile scissor switches with a month of battery per charge.', 10999, 13999, 40, 'Electronics', 'photo-1587829741301-dc798b83add3'],
@@ -56,7 +44,6 @@ const PRODUCTS = [
 	['Artisan Coffee Beans', 'Single-origin Ethiopian, roasted weekly in small batches.', 1299, 1699, 150, 'Groceries', 'photo-1517668808822-9ebb02f2a0e6'],
 ]
 
-// title, type, venue, city, hoursFromNow, rows, seatsPerRow, price, premiumRows, premiumPrice, photo id
 const EVENTS = [
 	['Interstellar — IMAX Re-release', 'movie', 'PVR ICON', 'Mumbai', 30, 7, 14, 450, 2, 750, 'photo-1489599849927-2ee91cede3ba'],
 	['The Midnight Symphony', 'concert', 'NSCI Dome', 'Mumbai', 54, 8, 16, 1500, 2, 3500, 'photo-1470229722913-7c0e2dbbafd3'],
@@ -65,7 +52,6 @@ const EVENTS = [
 	['Indie Nights: Live Sessions', 'concert', 'Phoenix Arena', 'Bengaluru', 126, 6, 14, 900, 2, 1800, 'photo-1459749411175-04bf5292ceea'],
 ]
 
-// productName, salePrice, saleStock, hoursLong
 const FLASH_SALES = [
 	['Premium Wireless Headphones', 6249, 25, 6],
 	['Smart Watch Pro', 8499, 15, 4],
@@ -75,7 +61,6 @@ const FLASH_SALES = [
 
 const ROW_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-// Reviewer personas so the seeded ratings read like real people, not lorem.
 const REVIEWERS = [
 	['Ananya Rao', 'ananya.demo@dropcart.local'],
 	['Rohit Menon', 'rohit.demo@dropcart.local'],
@@ -124,7 +109,6 @@ const run = async () => {
 		console.log(`Created seller ${SEED_EMAIL} (password: ${SEED_PASSWORD})`)
 	}
 
-	// --- products ---------------------------------------------------------
 	let createdProducts = 0
 	for (const [name, description, price, compareAtPrice, stock, category, photo] of PRODUCTS) {
 		if (await Product.findOne({ name, seller: seller._id })) continue
@@ -164,7 +148,6 @@ const run = async () => {
 	}
 	console.log(`Flash sales: ${createdSales} created and live.`)
 
-	// --- events + seat grids ---------------------------------------------
 	let createdEvents = 0
 	let createdSeats = 0
 	for (const [title, type, venue, city, hours, rows, perRow, price, premiumRows, premiumPrice, photo] of EVENTS) {
@@ -199,7 +182,6 @@ const run = async () => {
 		}
 		await Seat.insertMany(seats)
 
-		// Mark a scattered handful as booked so the seat map doesn't look untouched.
 		const sample = await Seat.find({ event: event._id }).limit(rows * perRow)
 		const taken = sample.filter((_, i) => i % 7 === 3).slice(0, Math.floor(rows * perRow * 0.15))
 		await Seat.updateMany({ _id: { $in: taken.map((s) => s._id) } }, { $set: { status: 'booked', bookedBy: seller._id } })
@@ -223,7 +205,7 @@ const run = async () => {
 	let createdReviews = 0
 
 	for (const [index, product] of seededProducts.entries()) {
-		// Vary how many reviews each product gets so the ratings aren't uniform.
+
 		const count = [4, 3, 5, 2, 3, 0, 4][index % 7]
 
 		for (let i = 0; i < count; i += 1) {

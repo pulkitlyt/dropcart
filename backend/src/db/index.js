@@ -1,13 +1,5 @@
 import mongoose from 'mongoose'
 
-/**
- * Serverless-safe connection.
- *
- * Every cold start runs module code again, so a naive `mongoose.connect()` would
- * open a fresh pool per invocation and exhaust the Atlas connection limit under
- * any real traffic. Vercel keeps the module scope alive between warm
- * invocations, so caching the promise on globalThis lets them share one pool.
- */
 const globalCache = globalThis.__dropcartMongoose ?? { conn: null, promise: null }
 globalThis.__dropcartMongoose = globalCache
 
@@ -20,7 +12,6 @@ const connectDB = async () => {
 
 		globalCache.promise = mongoose
 			.connect(uri, {
-				// Fail fast rather than hanging until the platform's request timeout.
 				serverSelectionTimeoutMS: 10000,
 				maxPoolSize: 10,
 			})
@@ -29,8 +20,6 @@ const connectDB = async () => {
 				return instance
 			})
 			.catch((error) => {
-				// Clear the cached promise so the next invocation retries instead of
-				// replaying a rejected promise forever.
 				globalCache.promise = null
 				throw error
 			})

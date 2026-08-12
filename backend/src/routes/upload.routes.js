@@ -5,10 +5,6 @@ import { uploadSingle, uploadMany, handleUploadErrors } from '../middlewares/upl
 import { uploadImage, uploadImages, deleteImage } from '../controllers/upload.controller.js'
 
 const router = Router()
-
-// Auth first, then multer: an unauthenticated request should be rejected before
-// its body is buffered into memory, not after. Uploads are restricted to
-// sellers and admins so an anonymous flood cannot burn the cloudinary quota.
 const canUpload = [verifyJWT, verifyRole('admin', 'seller')]
 
 router.post('/image', ...canUpload, uploadSingle, handleUploadErrors, uploadImage)

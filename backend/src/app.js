@@ -12,15 +12,10 @@ import eventRouter from './routes/event.routes.js'
 import reviewRouter from './routes/review.routes.js'
 import uploadRouter from './routes/upload.routes.js'
 
-// Local only: on Vercel the values come from the project's environment
-// settings and there is no .env file to read, which dotenv handles quietly.
 dotenv.config({ path: './.env', quiet: true })
 
 const app = express()
 
-// Same-origin in both environments means CORS is not normally exercised at all.
-// This stays as a safety net for anyone running the API on a separate host:
-// CORS_ORIGIN accepts a comma-separated list of allowed origins.
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
 	.split(',')
 	.map((origin) => origin.trim())
@@ -29,12 +24,7 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
 app.use(
 	cors({
 		origin(origin, callback) {
-			// No origin = same-origin request, curl, or a platform health check.
 			if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
-
-			// Deny by omitting the CORS headers rather than throwing: CORS is
-			// enforced by the browser, and throwing here turns a routine
-			// cross-origin probe into a misleading 500 in the server logs.
 			return callback(null, false)
 		},
 		credentials: true,
@@ -46,7 +36,6 @@ app.use(express.urlencoded({ extended: true, limit: '16kb' }))
 app.use(express.static('public'))
 app.use(cookieParser())
 
-// Render/Railway poll a health endpoint to decide if the instance is up.
 app.get('/api/v1/health', (req, res) =>
 	res.status(200).json({ status: 'ok', uptime: process.uptime() }),
 )
